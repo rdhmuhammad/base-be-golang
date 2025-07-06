@@ -19,7 +19,7 @@ type Cache interface {
 	Delete(ctx context.Context, keys ...string) error
 }
 
-func Default() DbClient {
+func Default() Cache {
 	password := os.Getenv("REDIS_PASSWORD")
 	host := os.Getenv("REDIS_HOST")
 	newClient := redis.NewClient(&redis.Options{
@@ -32,7 +32,7 @@ func Default() DbClient {
 		log.Println(err)
 	}
 	log.Println("redis start... ", pong)
-	return DbClient{
+	return &DbClient{
 		client: newClient,
 	}
 }

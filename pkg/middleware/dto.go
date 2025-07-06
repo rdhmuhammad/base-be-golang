@@ -6,6 +6,20 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+var (
+	CtxKeySession = "auth.session"
+	KeyBranchID   = "branchId"
+
+	// Session Check Middleware
+	RequestParams   = "request-params"
+	RequestQuery    = "request-query"
+	RequestBodyJSON = "request-body-json"
+
+	// Role Name
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+)
+
 type DefaultUserClaim struct {
 	UserData UserData `json:"userData"`
 	jwt.RegisteredClaims
