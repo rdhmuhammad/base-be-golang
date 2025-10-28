@@ -3,11 +3,12 @@
 package time
 
 import (
-	"base-be-golang/internal/constant"
 	"context"
 	"log"
 	"time"
 )
+
+var CtxKeyTimezone = "time.location"
 
 type clock struct {
 }
@@ -27,15 +28,15 @@ func Default() Clock {
 
 func (t clock) SetTimezoneToContext(ctx context.Context, val string) context.Context {
 	if val == "" {
-		return context.WithValue(ctx, constant.CtxKeyTimezone, time.UTC)
+		return context.WithValue(ctx, CtxKeyTimezone, time.UTC)
 	}
 	tz, _ := time.LoadLocation(val)
-	return context.WithValue(ctx, constant.CtxKeyTimezone, *tz)
+	return context.WithValue(ctx, CtxKeyTimezone, *tz)
 }
 
 func (t clock) GetTimezoneFromContext(ctx context.Context) *time.Location {
 	lz := time.UTC
-	if ct, ok := ctx.Value(constant.CtxKeyTimezone).(time.Location); ok {
+	if ct, ok := ctx.Value(CtxKeyTimezone).(time.Location); ok {
 		lz = &ct
 	}
 	return lz

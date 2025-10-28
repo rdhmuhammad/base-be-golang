@@ -1,12 +1,19 @@
 package middleware
 
 import (
+	"base-be-golang/internal/constant"
+	"base-be-golang/internal/core/domain"
 	"base-be-golang/internal/dto"
 	"base-be-golang/internal/localerror"
 	"base-be-golang/pkg/cache"
+	"base-be-golang/pkg/clock"
 	"base-be-golang/pkg/davinci"
+	"base-be-golang/pkg/db"
 	"base-be-golang/pkg/environment"
+	localerror2 "base-be-golang/pkg/localerror"
+	"base-be-golang/pkg/localize"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,26 +21,39 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/exp/slices"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
 
 type Auth struct {
-	cache   cache.Cache
-	davinci davinci.Generator
-	mapper  mapperAuth
-	env     environment.Environment
+	cache         cache.Cache
+	davinci       davinci.Engine
+	mapper        mapperAuth
+	env           environment.ENV
+	localize      localize.Language
+	clock         clock.CLOCK
+	userAdminRepo db.GenericRepository[domain.UserAdmin]
+	userRepo      db.GenericRepository[domain.User]
 }
 
-func NewAuth() AuthInterface {
+type ctxKey string
+
+const AuthCodeContext = ctxKey("authCode")
+
+func NewAuth(dbConn *gorm.DB) Auth {
 	return Auth{
-		cache:   cache.Default(),
-		davinci: davinci.DefaultDavinci(),
-		mapper:  SharedMapper{},
-		env:     environment.NewEnvironment(),
+		cache:         cache.Default(),
+		davinci:       davinci.DefaultDavinci(),
+		clock:         clock.Default(),
+		userRepo:      db.NewGenericeRepo(dbConn, domain.User{}),
+		userAdminRepo: db.NewGenericeRepo(dbConn, domain.UserAdmin{}),
+		mapper:        SharedMapper{},
+		localize:      localize.NewLanguage("resource/message"),
+		env:           environment.NewEnvironment(),
 	}
 }
 
@@ -43,6 +63,7 @@ type mapperAuth interface {
 
 func (receiver Auth) SignClaim(claim DefaultUserClaim) (string, error) {
 	method := jwt.SigningMethodHS256
+	claim.ExpiresAt = jwt.NewNumericDate(receiver.clock.NowUTC().Add(time.Hour * time.Duration(receiver.env.GetInt("EXPIRED_TOKEN_JWT", 0))))
 	token := &jwt.Token{
 		Header: map[string]interface{}{
 			"typ": "JWT",
@@ -62,7 +83,7 @@ func (receiver Auth) SignClaim(claim DefaultUserClaim) (string, error) {
 
 func (receiver Auth) GetSessionDataFromContext(c *gin.Context) (SessionDataUser, error) {
 	authData := receiver.GetAuthDataFromContext(c)
-	return receiver.GetSessionData(strconv.Itoa(int(authData.UserId)))
+	return receiver.GetSessionData(authData.UserId)
 }
 
 func (receiver Auth) GetSessionData(userId string) (SessionDataUser, error) {
@@ -79,7 +100,7 @@ func (receiver Auth) GetSessionData(userId string) (SessionDataUser, error) {
 	if err != nil {
 
 		if errors.Is(redis.Nil, err) {
-			return SessionDataUser{}, localerror.InvalidDataError{Msg: ""}
+			return SessionDataUser{}, localerror2.InvalidDataError{Msg: ""}
 		}
 		return SessionDataUser{}, err
 	}
@@ -93,91 +114,68 @@ func (receiver Auth) GetSessionData(userId string) (SessionDataUser, error) {
 	return sessionData, nil
 }
 
-func (receiver Auth) SessionCheck(placeOn string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if os.Getenv("BYPASS_SESSION_CHECKING") == "1" {
-			c.Next()
-			return
-		}
-		var paramKey = KeyBranchID
-		userData := receiver.GetAuthDataFromContext(c)
-		sessionData, err := receiver.GetSessionData(strconv.Itoa(int(userData.UserId)))
-		if err != nil {
-			response := dto.DefaultErrorInvalidDataWithMessage(fmt.Sprintf("sessionCheck: %s", err.Error()))
-			c.JSON(http.StatusUnauthorized, response)
-			c.Abort()
-			return
-		}
-		var param string
-		switch placeOn {
-		case RequestParams:
-			param = c.Param(paramKey)
-		case RequestQuery:
-			param = c.Query(paramKey)
-		case RequestBodyJSON:
-			body := receiver.mapper.GetBodyJSON(c)
-			switch v := body[paramKey].(type) {
-			case int:
-				param = strconv.FormatInt(int64(v), 10)
-			case uint:
-				param = strconv.FormatUint(uint64(v), 10)
-			case float32:
-				param = strconv.FormatFloat(float64(v), 'f', -1, 32)
-			case float64:
-				param = strconv.FormatFloat(float64(v), 'f', -1, 64)
-			case string:
-				param = v
-			}
-		}
-
-		paramBranchId, err := strconv.ParseUint(param, 10, 64)
-		if err != nil {
-
-			response := dto.DefaultErrorInvalidDataWithMessage(fmt.Sprintf("strconv.ParseUint(param): %s", err.Error()))
-			c.JSON(http.StatusInternalServerError, response)
-			c.Abort()
-			return
-		}
-
-		if sessionData.BranchID == uint(paramBranchId) &&
-			sessionData.RoleName == RoleUser {
-			c.Next()
-			return
-		}
-		response := dto.DefaultErrorInvalidDataWithMessage("Tidak memiliki akses")
-		c.JSON(http.StatusUnauthorized, response)
-		c.Abort()
-		return
-	}
-
-}
-
 func (receiver Auth) Authorize(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		var authData = UserData{}
 		authDataStr, ok := c.Get("authData")
 		if ok {
-			authDataMap := authDataStr.(map[string]interface{})
-			err := authData.LoadFromMap(authDataMap)
-			if err != nil {
-
-				c.JSON(http.StatusUnauthorized, "invalid token")
-				c.Abort()
-				return
-			}
+			authData = authDataStr.(UserData)
 		}
+
 		if slices.Contains(roles, authData.RoleName) {
 			c.Next()
 			return
 		}
 
 		response := dto.DefaultBadRequestResponse()
-		response.Message = "Kamu tidak punya akses ke halaman ini"
+		response.Message = receiver.localize.GetLocalized(authData.Lang, constant.AccessNotAllowed)
 		response.ResponseTime = fmt.Sprint(time.Since(start).Milliseconds(), " ms.")
 		c.JSON(http.StatusUnauthorized, response)
 		c.Abort()
 	}
+}
+
+func (receiver Auth) setUserActivity(authData UserData) {
+	if authData.RoleName == constant.RolesIsMobile {
+		user, err := receiver.userRepo.FindOneByExpression(
+			context.Background(),
+			[]clause.Expression{db.Equal(authData.UserId, "auth_code")},
+		)
+		if err != nil {
+			CaptureErrorUsecase(context.Background(), err)
+			fmt.Println(err.Error())
+			return
+		}
+
+		user.LastActive = sql.NullTime{Time: time.Now(), Valid: true}
+		err = receiver.userRepo.UpdateSelectedCols(context.Background(), user, "last_active")
+		if err != nil {
+			CaptureErrorUsecase(context.Background(), err)
+			fmt.Println(err.Error())
+			return
+		}
+		return
+	}
+
+	user, err := receiver.userAdminRepo.FindOneByExpression(
+		context.Background(),
+		[]clause.Expression{db.Equal(authData.UserId, "auth_code")},
+	)
+	if err != nil {
+		CaptureErrorUsecase(context.Background(), err)
+		fmt.Println(err.Error())
+		return
+	}
+
+	user.LastActive = sql.NullTime{Time: time.Now(), Valid: true}
+	err = receiver.userAdminRepo.UpdateSelectedCols(context.Background(), user, "last_active")
+	if err != nil {
+		CaptureErrorUsecase(context.Background(), err)
+		fmt.Println(err.Error())
+		return
+	}
+
 }
 
 func (receiver Auth) Validate() gin.HandlerFunc {
@@ -189,7 +187,7 @@ func (receiver Auth) Validate() gin.HandlerFunc {
 		token, err := receiver.parseToken(tokenStr, []byte(secret))
 		if err != nil {
 
-			response := dto.DefaultErrorResponseWithMessage(err.Error())
+			response := dto.DefaultErrorResponseWithMessage(err.Error(), err)
 			response.ResponseTime = fmt.Sprint(time.Since(start).Milliseconds(), " ms.")
 			c.JSON(http.StatusUnauthorized, response)
 			c.Abort()
@@ -201,11 +199,9 @@ func (receiver Auth) Validate() gin.HandlerFunc {
 		userDataStruct := UserData{}
 		err = userDataStruct.LoadFromMap(authData)
 		if err != nil {
-
 			if err != nil {
-
-				response := dto.DefaultErrorResponse()
-				response.Message = "Parse JWT payload failed."
+				response := dto.DefaultErrorResponse(err)
+				response.Message = receiver.localize.GetLocalized(userDataStruct.Lang, constant.SessionExpired)
 				response.ResponseTime = fmt.Sprint(time.Since(start).Milliseconds(), " ms.")
 				c.JSON(http.StatusUnauthorized, response)
 				c.Abort()
@@ -213,12 +209,18 @@ func (receiver Auth) Validate() gin.HandlerFunc {
 			}
 		}
 		if valid {
-			c.Set("authData", authData)
+
+			receiver.setUserActivity(userDataStruct)
+
+			c.Set("authData", userDataStruct)
+			olCtx := c.Request.Context()
+			newCtx := context.WithValue(olCtx, AuthCodeContext, userDataStruct)
+			c.Request = c.Request.WithContext(newCtx)
 			c.Next()
 			return
 		}
 
-		response := dto.DefaultErrorResponse()
+		response := dto.DefaultErrorResponse(err)
 		response.ResponseTime = fmt.Sprint(time.Since(start).Milliseconds(), " ms.")
 		c.JSON(http.StatusUnauthorized, response)
 		c.Abort()
@@ -236,7 +238,26 @@ func (receiver Auth) parseToken(tokenStr string, secret []byte) (*jwt.Token, err
 
 		return nil, err
 	}
-	return token, nil
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if valid := claims.VerifyExpiresAt(receiver.clock.NowUTC().Unix(), true); valid {
+			return token, nil
+		}
+		return nil, localerror2.AccessControlError{Msg: constant.SessionExpired}
+	}
+
+	return nil, localerror2.AccessControlError{Msg: constant.SessionExpired}
+}
+
+func (receiver Auth) GetUserLogin(ctx context.Context) UserData {
+	value := ctx.Value(AuthCodeContext)
+	mapped, ok := value.(UserData)
+	if !ok {
+		fmt.Println("Cannot read struct with value ", value)
+		return UserData{}
+	}
+
+	return mapped
 }
 
 func (receiver Auth) GetAuthDataFromContext(c *gin.Context) UserData {
@@ -248,7 +269,6 @@ func (receiver Auth) GetAuthDataFromContext(c *gin.Context) UserData {
 	authDataMap := authDataStr.(map[string]interface{})
 	err := authData.LoadFromMap(authDataMap)
 	if err != nil {
-
 		return UserData{}
 	}
 	if !ok {
@@ -289,16 +309,4 @@ func (receiver Auth) SetSessionToContext(c *gin.Context, ctx context.Context) (c
 	}
 
 	return context.WithValue(ctx, CtxKeySession, fromContext), nil
-}
-
-type AuthInterface interface {
-	GetSessionFromContext(ctx context.Context) SessionDataUser
-	SetSessionToContext(c *gin.Context, ctx context.Context) (context.Context, error)
-	SignClaim(claim DefaultUserClaim) (string, error)
-	Validate() gin.HandlerFunc
-	Authorize(roles ...string) gin.HandlerFunc
-	GetAuthDataFromContext(c *gin.Context) UserData
-	GetSessionData(userId string) (SessionDataUser, error)
-	GetSessionDataFromContext(c *gin.Context) (SessionDataUser, error)
-	SessionCheck(placeOn string) gin.HandlerFunc
 }

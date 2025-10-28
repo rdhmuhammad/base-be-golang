@@ -3,9 +3,9 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
-	"log"
 	"path/filepath"
 )
 
@@ -34,7 +34,7 @@ func (idem SharedMapper) GetBodyMultiPart(c *gin.Context) map[string]any {
 	reqBody, err := c.MultipartForm()
 	if err != nil {
 
-		log.Println("c.MultipartForm: %w", err)
+		fmt.Println("c.MultipartForm: %w", err)
 	}
 
 	body := make(map[string]any)

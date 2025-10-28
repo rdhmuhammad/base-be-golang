@@ -1,8 +1,8 @@
 package middleware
 
 import (
+	"fmt"
 	"github.com/go-playground/validator/v10"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -34,13 +34,13 @@ func validateMonthYearFormat(fl validator.FieldLevel) bool {
 	}
 	month, err := strconv.ParseUint(r[0], 10, 64)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return false
 	}
 
 	year, err := strconv.ParseUint(r[1], 10, 64)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return false
 	}
 

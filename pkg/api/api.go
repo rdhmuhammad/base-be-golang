@@ -15,7 +15,7 @@ type Router interface {
 }
 
 func (a Api) Start() error {
-	root := a.server.Group("/main")
+	root := a.server.Group("/api/v1")
 	for _, router := range a.routers {
 		router.Route(root)
 	}

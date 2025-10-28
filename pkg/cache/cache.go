@@ -2,8 +2,8 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"github.com/redis/go-redis/v9"
-	"log"
 	"os"
 	"time"
 )
@@ -29,9 +29,9 @@ func Default() Cache {
 	})
 	pong, err := newClient.Ping(context.Background()).Result()
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 	}
-	log.Println("redis start... ", pong)
+	fmt.Println("redis start... ", pong)
 	return &DbClient{
 		client: newClient,
 	}

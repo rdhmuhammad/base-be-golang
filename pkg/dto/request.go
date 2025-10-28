@@ -8,12 +8,31 @@ import (
 	"time"
 )
 
+type GetListQueryNoPeriod struct {
+	PerPage      int       `bindQuery:"dataType=integer" json:"perPage"`
+	Page         int       `bindQuery:"dataType=integer" json:"page"`
+	Search       string    `json:"search"`
+	Date         time.Time `bindQuery:"dataType=timestamp" json:"date"`
+	TimeZone     string    `json:"-"`
+	ResponseType string
+}
+
+func (l *GetListQueryNoPeriod) SetIfEmpty() {
+	if l.Page == 0 {
+		l.Page = 1
+	}
+
+	if l.PerPage == 0 {
+		l.PerPage = 15
+	}
+
+}
+
 type GetListQuery struct {
 	PerPage      int          `json:"perPage"`
 	Page         int          `json:"page"`
 	Search       string       `json:"search"`
 	Date         time.Time    `json:"date"`
-	BranchID     uint         `json:"branchId"`
 	FilterPeriod FilterPeriod `validate:"dive" json:"filterPeriod"`
 	TimeZone     string       `json:"-"`
 	ResponseType string
@@ -39,18 +58,6 @@ func NewGetListQueryFromContext(c *gin.Context, rules map[string]any) (GetListQu
 			PeriodType: c.Query("periodType"),
 		},
 	}
-
-	branchIdStr := c.Param("branchId")
-	if valid, ok := rules["branchIdOnQuery"].(bool); ok && valid {
-		branchIdStr = c.Query("branchId")
-	}
-
-	branchId, err := strconv.ParseUint(branchIdStr, 10, 64)
-	if err != nil {
-
-		return GetListQuery{}, fmt.Errorf("format branchId tidak valid")
-	}
-	query.BranchID = uint(branchId)
 
 	if c.Query("year") != "" {
 		year, err := strconv.ParseInt(c.Query("year"), 10, 64)

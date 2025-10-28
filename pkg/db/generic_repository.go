@@ -6,7 +6,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
-	"log"
+	"reflect"
+	"strings"
 	"time"
 )
 
@@ -34,31 +35,37 @@ func NewGenericeRepo[T schema.Tabler](db *gorm.DB, table T) GenericRepository[T]
 }
 
 var (
+	/**
+	Format input
+	- TableName.ColName
+	- ColName
+	Return TableName, ColumnName
+	*/
 	getColNameStr = func(col string) (string, string) {
 		var colName, tableName string
-		_, err := fmt.Sscanf(col, "%s.%s", &colName, &tableName)
-		if err != nil {
-			log.Println("invalid coloumn name, format is table.column")
-			return col, ""
+		split := strings.Split(col, ".")
+		if len(split) == 2 {
+			tableName = split[0]
+			colName = split[1]
+			return tableName, colName
 		}
-
-		return colName, tableName
+		return "", col
 	}
 
-	ExpressionSearch = func(val string, colName ...string) clause.Expression {
-		var exps = make([]clause.Expression, len(colName))
-		for i, coln := range colName {
-			col, table := getColNameStr(coln)
+	Search = func(val string, col ...string) clause.Expression {
+		var exps = make([]clause.Expression, len(col))
+		for i, c := range col {
+			tableName, colName := getColNameStr(c)
 			exps[i] = clause.Like{
-				Column: clause.Column{Name: col, Table: table},
+				Column: clause.Column{Name: colName, Table: tableName},
 				Value:  "%" + val + "%",
 			}
 		}
 		return clause.Or(exps...)
 	}
 
-	ExpressionEqual = func(val interface{}, col string) clause.Expression {
-		colName, tableName := getColNameStr(col)
+	Equal = func(val interface{}, col string) clause.Expression {
+		tableName, colName := getColNameStr(col)
 		return clause.Eq{
 			Column: clause.Column{Name: colName, Table: tableName},
 			Value:  val,
@@ -77,19 +84,35 @@ var (
 			},
 		)
 	}
+	Query = func(exps ...clause.Expression) []clause.Expression {
+		return exps
+	}
 )
 
-func ExpressionInArray[T interface{}](val []T, colName string) clause.Expression {
-	col, table := getColNameStr(colName)
+func InArray[T interface{}](val []T, col string) clause.Expression {
+	tableName, colName := getColNameStr(col)
 	output := make([]interface{}, len(val))
 	for i, v := range val {
 		output[i] = v
 	}
 
 	return clause.IN{
-		Column: clause.Column{Name: col, Table: table},
+		Column: clause.Column{Name: colName, Table: tableName},
 		Values: output,
 	}
+}
+
+func NotInArray[T interface{}](val []T, col string) clause.Expression {
+	tableName, colName := getColNameStr(col)
+	output := make([]interface{}, len(val))
+	for i, v := range val {
+		output[i] = v
+	}
+
+	return clause.Not(clause.IN{
+		Column: clause.Column{Name: colName, Table: tableName},
+		Values: output,
+	})
 }
 
 type PaginationQuery struct {
@@ -103,6 +126,16 @@ type GenericRepositoryInterface[T any] interface {
 		expression []clause.Expression,
 	) ([]T, error)
 	FindAll(ctx context.Context) ([]T, error)
+	FindPagedByExpression(ctx context.Context, cond []clause.Expression, paginate PaginationQuery) ([]T, int, error)
+	FindPagedByExpressionAndPreloadConditioned(
+		ctx context.Context,
+		cond []clause.Expression,
+		paginate PaginationQuery,
+		joins []string,
+		preload []PreloadWithCondition,
+		expType int,
+	) ([]T, int, error)
+	FindAllByExpressionAndPreloadConditioned(ctx context.Context, cond []clause.Expression, joins []string, preload []PreloadWithCondition) ([]T, error)
 	FindAllByExpressionAndJoin(
 		ctx context.Context,
 		cond []clause.Expression,
@@ -115,6 +148,8 @@ type GenericRepositoryInterface[T any] interface {
 		join []string,
 		preload []string,
 	) ([]T, error)
+	CountByExpression(ctx context.Context, exp []clause.Expression) (int, error)
+	CountByExpressionAndJoin(ctx context.Context, exp []clause.Expression, join []string) (int, error)
 	SumByExpression(ctx context.Context, col string, exp []clause.Expression) (int, error)
 	Update(ctx context.Context, data T) error
 	UpdateSelectedCols(ctx context.Context, data T, columns ...string) error
@@ -122,7 +157,9 @@ type GenericRepositoryInterface[T any] interface {
 	DeleteByExpression(ctx context.Context, exp []clause.Expression) error
 	StoreExclude(ctx context.Context, data T, ignore ...string) (T, error)
 	Store(ctx context.Context, data T) (T, error)
+	DeleteByID(ctx context.Context, id uint) error
 	Delete(ctx context.Context, data T) error
+	BulkDelete(ctx context.Context, data []T) error
 	FindOneByID(ctx context.Context, id interface{}) (T, error)
 	FindOneByExpressionAndJoin(
 		ctx context.Context,
@@ -134,19 +171,52 @@ type GenericRepositoryInterface[T any] interface {
 		ctx context.Context,
 		cond []clause.Expression,
 	) (T, error)
-	FindAllByExpressionPaginateJoin(
-		ctx context.Context,
-		paginate PaginationQuery,
-		cond []clause.Expression,
-		join []string,
-		preload []string,
-	) ([]T, int, error)
+	FindPagedByExpressionJoin(ctx context.Context, cond []clause.Expression, paginate PaginationQuery, join []string, preload []string, expType int) ([]T, int, error)
 	FindAllByExpressionPaginate(
 		ctx context.Context,
 		paginate PaginationQuery,
 		cond []clause.Expression,
 	) ([]T, int, error)
 	BulkUpdateSelectedColumn(ctx context.Context, children []T, fields ...string) error
+	IsExistCondition(
+		ctx context.Context,
+		cond []clause.Expression,
+	) (bool, error)
+	IsExist(
+		ctx context.Context,
+		column string, val interface{}) (bool, error)
+
+	/**
+	================ selection usage ==============
+	*/
+
+	FindOneByIDSelection(
+		ctx context.Context,
+		entity interface{},
+		id interface{},
+	) error
+	FindOneByExpSelection(
+		ctx context.Context,
+		entity interface{},
+		cond []clause.Expression,
+	) error
+	FindAllByExpSelection(
+		ctx context.Context,
+		entity interface{},
+		cond []clause.Expression,
+	) error
+	JoinAllByExpSelection(
+		ctx context.Context,
+		entity interface{},
+		cond []clause.Expression,
+		joins []string,
+	) error
+	JoinOneByExpSelection(
+		ctx context.Context,
+		entity interface{},
+		cond []clause.Expression,
+		joins []string,
+	) error
 }
 
 func (repo GenericRepository[T]) BulkUpdateSelectedColumn(ctx context.Context, children []T, fields ...string) error {
@@ -164,6 +234,34 @@ func (repo GenericRepository[T]) BulkUpdateSelectedColumn(ctx context.Context, c
 
 func (repo GenericRepository[T]) Update(ctx context.Context, data T) error {
 	return repo.db.WithContext(ctx).Updates(&data).Error
+}
+
+func (repo GenericRepository[T]) CountByExpressionAndJoin(ctx context.Context, exp []clause.Expression, join []string) (int, error) {
+	var count int64
+	db := repo.db.WithContext(ctx).
+		Model(&repo.model)
+
+	for _, j := range join {
+		db = db.Joins(j)
+	}
+
+	for _, c := range exp {
+		db = db.Where(c)
+	}
+
+	err := db.Count(&count).Error
+
+	return int(count), err
+}
+
+func (repo GenericRepository[T]) CountByExpression(ctx context.Context, exp []clause.Expression) (int, error) {
+	var count int64
+	err := repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Clauses(clause.Where{Exprs: exp}).
+		Count(&count).Error
+
+	return int(count), err
 }
 
 func (repo GenericRepository[T]) SumByExpression(ctx context.Context, col string, exp []clause.Expression) (int, error) {
@@ -213,6 +311,16 @@ func (repo GenericRepository[T]) DeleteByExpression(ctx context.Context, exp []c
 }
 
 func (repo GenericRepository[T]) Delete(ctx context.Context, data T) error {
+	return repo.db.WithContext(ctx).Delete(&data).Error
+}
+
+func (repo GenericRepository[T]) DeleteByID(ctx context.Context, id uint) error {
+	return repo.db.WithContext(ctx).
+		Where("id = ?", id).
+		Delete(&repo.model).Error
+}
+
+func (repo GenericRepository[T]) BulkDelete(ctx context.Context, data []T) error {
 	return repo.db.WithContext(ctx).Delete(&data).Error
 }
 
@@ -306,6 +414,137 @@ func (repo GenericRepository[T]) FindOneByExpression(
 	return result, err
 }
 
+type PreloadWithCondition struct {
+	ColName string
+	Args    []interface{}
+}
+
+func (repo GenericRepository[T]) FindPagedByExpression(
+	ctx context.Context,
+	cond []clause.Expression,
+	paginate PaginationQuery,
+) ([]T, int, error) {
+	var result []T
+	var total int64
+
+	db := repo.db.WithContext(ctx).
+		Model(&result)
+
+	errCount := db.Count(&total).Error
+	if errCount != nil {
+		return nil, 0, errCount
+	}
+
+	offset := paginate.PerPage * (paginate.Page - 1)
+	limit := paginate.PerPage
+
+	if len(cond) > 0 {
+		db = db.Clauses(clause.Where{Exprs: cond})
+	}
+
+	err := db.
+		Find(&result).
+		Offset(offset).
+		Limit(limit).Error
+
+	return result, int(total), err
+}
+
+const (
+	ExpressionOr = iota
+	ExpressionAnd
+)
+
+func (repo GenericRepository[T]) FindPagedByExpressionAndPreloadConditioned(
+	ctx context.Context,
+	cond []clause.Expression,
+	paginate PaginationQuery,
+	joins []string,
+	preload []PreloadWithCondition,
+	expType int,
+) ([]T, int, error) {
+	var result []T
+	var total int64
+
+	db := repo.db.WithContext(ctx).
+		Model(&result)
+
+	db = repo.applyWhereClause(cond, expType, db)
+
+	for _, j := range joins {
+		db = db.Joins(j)
+	}
+
+	for _, s := range preload {
+		if len(s.Args) == 0 {
+			db = db.Preload(s.ColName)
+		} else {
+			db = db.Preload(s.ColName, s.Args...)
+		}
+	}
+
+	errCount := db.Count(&total).Error
+	if errCount != nil {
+		return nil, 0, errCount
+	}
+
+	offset := paginate.PerPage * (paginate.Page - 1)
+	limit := paginate.PerPage
+
+	err := db.
+		Offset(offset).
+		Limit(limit).
+		Find(&result).
+		Error
+	return result, int(total), err
+}
+
+func (repo GenericRepository[T]) applyWhereClause(cond []clause.Expression, expType int, db *gorm.DB) *gorm.DB {
+	if len(cond) > 0 {
+		switch expType {
+		case ExpressionOr:
+			db = db.Clauses(clause.Where{Exprs: cond})
+			break
+		case ExpressionAnd:
+			for _, c := range cond {
+				db = db.Where(c)
+			}
+			break
+		}
+	}
+	return db
+}
+
+func (repo GenericRepository[T]) FindAllByExpressionAndPreloadConditioned(
+	ctx context.Context,
+	cond []clause.Expression,
+	joins []string,
+	preload []PreloadWithCondition,
+) ([]T, error) {
+	var result []T
+	db := repo.db.WithContext(ctx).
+		Model(&result)
+
+	if len(cond) > 0 {
+		db = db.Clauses(clause.Where{Exprs: cond})
+	}
+
+	for _, j := range joins {
+		db = db.Joins(j)
+	}
+
+	for _, s := range preload {
+		if len(s.Args) == 0 {
+			db = db.Preload(s.ColName)
+		} else {
+			db = db.Preload(s.ColName, s.Args...)
+		}
+	}
+
+	err := db.Find(&result).Error
+	return result, err
+}
+
 func (repo GenericRepository[T]) FindAllByExpressionAndJoin(
 	ctx context.Context,
 	cond []clause.Expression,
@@ -328,18 +567,20 @@ func (repo GenericRepository[T]) FindAllByExpressionAndJoin(
 	return result, err
 }
 
-func (repo GenericRepository[T]) FindAllByExpressionPaginateJoin(
+func (repo GenericRepository[T]) FindPagedByExpressionJoin(
 	ctx context.Context,
-	paginate PaginationQuery,
 	cond []clause.Expression,
+	paginate PaginationQuery,
 	join []string,
 	preload []string,
+	expType int,
 ) ([]T, int, error) {
 	var result []T
 	var total int64
 	db := repo.db.WithContext(ctx).
-		Model(&result).
-		Clauses(clause.Where{Exprs: cond})
+		Model(&result)
+
+	db = repo.applyWhereClause(cond, expType, db)
 
 	for _, j := range join {
 		db = db.Joins(j)
@@ -388,4 +629,198 @@ func (repo GenericRepository[T]) FindAllByExpressionPaginate(
 		Offset(offset).Error
 
 	return result, int(total), err
+}
+func (repo GenericRepository[T]) IsExistCondition(
+	ctx context.Context,
+	cond []clause.Expression,
+) (bool, error) {
+	var total int64
+	err := repo.db.WithContext(ctx).
+		Model(&repo.model).
+		Clauses(clause.Where{Exprs: cond}).
+		Count(&total).Error
+
+	return total > 0, err
+}
+
+func (repo GenericRepository[T]) IsExist(
+	ctx context.Context,
+	column string, val interface{}) (bool, error) {
+	var total int64
+	err := repo.db.WithContext(ctx).
+		Model(&repo.model).
+		Clauses(clause.Where{Exprs: []clause.Expression{
+			clause.Eq{
+				Column: clause.Column{Name: column, Table: repo.model.TableName()},
+				Value:  val,
+			},
+		}}).
+		Count(&total).Error
+
+	return total > 0, err
+}
+
+/**
+===================== USAGE WITH SPECIFIC COLUMN SELECTION =======================
+*/
+
+func (repo GenericRepository[T]) extractSelection(entity interface{}) ([]string, error) {
+	typeOf := reflect.TypeOf(entity)
+	if typeOf.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("should had parsing entity struct pointer to parameter")
+	}
+
+	var results = make([]string, 0)
+
+	elem := typeOf.Elem()
+	switch elem.Kind() {
+	case reflect.Struct:
+		results = repo.fromStruct(elem)
+		break
+	case reflect.Array, reflect.Slice:
+		results = repo.fromStruct(elem.Elem())
+		break
+	default:
+		results = []string{}
+	}
+
+	return results, nil
+}
+
+func (repo GenericRepository[T]) fromStruct(elem reflect.Type) []string {
+	var results = make([]string, elem.NumField())
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		gormTag := field.Tag.Get("gorm")
+
+		// Extract column name from gorm tag
+		var columnName string
+		if strings.Contains(gormTag, "column:") {
+			// Find the start of "column:"
+			parts := strings.Split(gormTag, ";")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if strings.HasPrefix(part, "column:") {
+					columnName = strings.TrimPrefix(part, "column:")
+					break
+				}
+			}
+		}
+
+		// Use column name if found, otherwise use field name
+		if columnName != "" {
+			results[i] = columnName
+		}
+	}
+	return results
+}
+
+func (repo GenericRepository[T]) FindOneByIDSelection(
+	ctx context.Context,
+	entity interface{},
+	id interface{},
+) error {
+	selection, err := repo.extractSelection(entity)
+	if err != nil {
+		return err
+	}
+
+	err = repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Select(selection).
+		First(entity, "id = ?", id).Error
+
+	return err
+}
+
+func (repo GenericRepository[T]) FindOneByExpSelection(
+	ctx context.Context,
+	entity interface{},
+	cond []clause.Expression,
+) error {
+	selection, err := repo.extractSelection(entity)
+	if err != nil {
+		return err
+	}
+
+	err = repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Select(selection).
+		Where(clause.Where{Exprs: cond}).
+		First(entity).Error
+
+	return err
+}
+
+func (repo GenericRepository[T]) FindAllByExpSelection(
+	ctx context.Context,
+	entity interface{},
+	cond []clause.Expression,
+) error {
+	selection, err := repo.extractSelection(entity)
+	if err != nil {
+		return err
+	}
+
+	err = repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Select(selection).
+		Where(clause.Where{Exprs: cond}).
+		Find(entity).Error
+
+	return err
+}
+
+func (repo GenericRepository[T]) JoinAllByExpSelection(
+	ctx context.Context,
+	entity interface{},
+	cond []clause.Expression,
+	joins []string,
+) error {
+	selection, err := repo.extractSelection(entity)
+	if err != nil {
+		return err
+	}
+
+	tx := repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Select(selection)
+
+	for _, j := range joins {
+		tx = tx.Joins(j)
+	}
+
+	err = tx.
+		Where(clause.Where{Exprs: cond}).
+		Find(entity).Error
+
+	return err
+
+}
+
+func (repo GenericRepository[T]) JoinOneByExpSelection(
+	ctx context.Context,
+	entity interface{},
+	cond []clause.Expression,
+	joins []string,
+) error {
+	selection, err := repo.extractSelection(entity)
+	if err != nil {
+		return err
+	}
+
+	tx := repo.db.WithContext(ctx).
+		Table(repo.model.TableName()).
+		Select(selection)
+
+	for _, j := range joins {
+		tx = tx.Joins(j)
+	}
+
+	err = tx.
+		Where(clause.Where{Exprs: cond}).
+		First(entity).Error
+
+	return err
+
 }

@@ -9,32 +9,27 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
-	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-type idempotent struct {
+type IDEMPOTENT struct {
 	cache cache.Cache
 }
 
 func NewIdempotent(
 	defaultCache cache.Cache,
-) Idempotent {
-	return idempotent{
+) IDEMPOTENT {
+	return IDEMPOTENT{
 		cache: defaultCache,
 	}
 }
 
-type Idempotent interface {
-	Idempotent(name string, paramKey string, lockTime time.Duration) gin.HandlerFunc
-}
+const IdempotencePrefixKey = "kassir-be:IDEMPOTENT"
 
-const IdempotencePrefixKey = "kassir-be:idempotent"
-
-func (idem idempotent) Idempotent(name string, paramKey string, lockTime time.Duration) gin.HandlerFunc {
+func (idem IDEMPOTENT) Idempotent(name string, paramKey string, lockTime time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// prepare the key
 		key := strings.ReplaceAll(strings.ToLower(c.Param(paramKey)), " ", "")
@@ -54,7 +49,7 @@ func (idem idempotent) Idempotent(name string, paramKey string, lockTime time.Du
 
 		}
 		if key == "" {
-			log.Println("idempotent key not found")
+			fmt.Println("IDEMPOTENT key not found")
 			c.Next()
 			return
 		}
@@ -65,10 +60,10 @@ func (idem idempotent) Idempotent(name string, paramKey string, lockTime time.Du
 		ctx := context.Background()
 		lock, err := idem.cache.Get(ctx, idempotenceKey)
 		if err != nil {
-			log.Println("idempotent.go 68: ", err)
+			fmt.Println("IDEMPOTENT.go 68: ", err)
 		}
 		if lock != "" {
-			c.JSON(http.StatusConflict, dto.DefaultErrorResponseWithMessage("idempotent request"))
+			c.JSON(http.StatusConflict, dto.DefaultErrorResponseWithMessage("IDEMPOTENT request", err))
 			c.Abort()
 			return
 		}
@@ -76,7 +71,7 @@ func (idem idempotent) Idempotent(name string, paramKey string, lockTime time.Du
 		// lock request
 		err = idem.cache.Set(ctx, idempotenceKey, "locked", lockTime)
 		if err != nil {
-			log.Println("idempotent.go 79: ", err)
+			fmt.Println("IDEMPOTENT.go 79: ", err)
 		}
 
 		// handle request
@@ -84,16 +79,16 @@ func (idem idempotent) Idempotent(name string, paramKey string, lockTime time.Du
 	}
 }
 
-func (idem idempotent) getBodyJSON(c *gin.Context) map[string]any {
+func (idem IDEMPOTENT) getBodyJSON(c *gin.Context) map[string]any {
 	var body = map[string]any{}
 	bodyRaw := c.Copy().Request.Body
 	bodyByte, err := io.ReadAll(bodyRaw)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 	}
 	err = json.Unmarshal(bodyByte, &body)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 	}
 
 	// Restore the request body so it can be used by Gin
@@ -102,10 +97,10 @@ func (idem idempotent) getBodyJSON(c *gin.Context) map[string]any {
 	return body
 }
 
-func (idem idempotent) getBodyMultiPart(c *gin.Context) map[string]any {
+func (idem IDEMPOTENT) getBodyMultiPart(c *gin.Context) map[string]any {
 	reqBody, err := c.MultipartForm()
 	if err != nil {
-		log.Println("c.MultipartForm: %w", err)
+		fmt.Println("c.MultipartForm: %w", err)
 	}
 
 	body := make(map[string]any)

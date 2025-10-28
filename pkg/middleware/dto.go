@@ -30,11 +30,11 @@ type TestStruct struct {
 }
 
 type UserData struct {
-	Username string `json:"username"`
-	UserId   uint   `json:"userId"`
-	BranchID uint   `json:"branchId"`
-	Email    string `json:"email"`
-	RoleName string `json:"roleName"`
+	UserId      string `json:"userId"`
+	Lang        string `json:"lang"`
+	LangContent string `json:"langContent"`
+	Email       string `json:"email"`
+	RoleName    string `json:"roleName"`
 }
 
 func (authData *UserData) LoadFromMap(m map[string]interface{}) error {

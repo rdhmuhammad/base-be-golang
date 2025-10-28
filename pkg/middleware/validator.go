@@ -12,8 +12,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	translations_en "github.com/go-playground/validator/v10/translations/en"
 	"github.com/google/uuid"
+	"mime/multipart"
 
-	"log"
 	"regexp"
 	"strconv"
 	"time"
@@ -28,14 +28,7 @@ type Enigma struct {
 	trans  ut.Translator
 }
 
-type EnigmaUtility interface {
-	Validate(c *gin.Context, payload any) map[string][]string
-	BindAndValidate(c *gin.Context, payload any) map[string][]string
-	BindQueryToFilter(c *gin.Context, payload interface{}) error
-	BindQueryToFilterAndValidate(c *gin.Context, payload interface{}) map[string][]string
-}
-
-func NewEnigma() EnigmaUtility {
+func NewEnigma() Enigma {
 	engine := validator.New()
 	engine.RegisterTagNameFunc(func(field reflect.StructField) string {
 		name := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
@@ -49,13 +42,13 @@ func NewEnigma() EnigmaUtility {
 	err := engine.RegisterValidation("enum", validateEnumValue)
 	if err != nil {
 
-		return nil
+		return Enigma{}
 	}
 
 	err = engine.RegisterValidation("monthyearformat", validateMonthYearFormat)
 	if err != nil {
 
-		return nil
+		return Enigma{}
 	}
 
 	en := en2.New()
@@ -64,18 +57,18 @@ func NewEnigma() EnigmaUtility {
 	err = translations_en.RegisterDefaultTranslations(engine, trans)
 	if err != nil {
 
-		log.Println("new validator: ", err)
-		return nil
+		fmt.Println("new validator: ", err)
+		return Enigma{}
 	}
 
 	err = OverrideTranslation(engine, trans)
 	if err != nil {
 
-		log.Println("new validator: ", err)
-		return nil
+		fmt.Println("new validator: ", err)
+		return Enigma{}
 	}
 
-	return &Enigma{
+	return Enigma{
 		engine: engine,
 		trans:  trans,
 	}
@@ -101,7 +94,12 @@ func (v Enigma) Validate(c *gin.Context, payload any) map[string][]string {
 }
 
 func (v Enigma) BindAndValidate(c *gin.Context, payload any) map[string][]string {
-	err := c.Bind(payload)
+	var err error
+	if c.ContentType() == gin.MIMEMultipartPOSTForm {
+		err = c.ShouldBind(payload)
+	} else {
+		err = c.Bind(payload)
+	}
 	if err != nil {
 
 		var errJSON *json.UnmarshalTypeError
@@ -153,17 +151,9 @@ func (v Enigma) BindQueryToFilterAndValidate(c *gin.Context, payload interface{}
 }
 
 func (v Enigma) queryToFilter(c *gin.Context, payload interface{}, isDive bool) error {
-	pVal := reflect.ValueOf(payload)
-	pType := reflect.TypeOf(payload)
-	if
-	//pVal.Kind() != reflect.Pointer||
-	pVal.IsNil() {
-		return fmt.Errorf("payload is nil")
-	}
-
-	vals := pVal.Elem()
-	if vals.Kind() != reflect.Struct && !isDive {
-		return fmt.Errorf("payload should be struct")
+	pVal, pType, vals, err := v.preparingReflection(payload, isDive)
+	if err != nil {
+		return err
 	}
 
 	for i := 0; i < vals.NumField(); i++ {
@@ -206,7 +196,7 @@ func (v Enigma) queryToFilter(c *gin.Context, payload interface{}, isDive bool) 
 			finalVal interface{}
 			err      error
 		)
-		if binder, ok := binding[tags["dataType"]]; ok {
+		if binder, ok := bindingRules[tags["dataType"]]; ok {
 			finalVal, err = binder(c, reqVal, tags)
 			if err != nil {
 				return err
@@ -221,6 +211,26 @@ func (v Enigma) queryToFilter(c *gin.Context, payload interface{}, isDive bool) 
 	return nil
 }
 
+func (v Enigma) preparingReflection(payload interface{}, isDive bool) (reflect.Value, reflect.Type, reflect.Value, error) {
+	pVal := reflect.ValueOf(payload)
+	pType := reflect.TypeOf(payload)
+	if
+	//pVal.Kind() != reflect.Pointer||
+	pVal.IsNil() {
+		return reflect.Value{}, nil, reflect.Value{}, fmt.Errorf("payload is nil")
+	}
+
+	vals := pVal.Elem()
+	if vals.Kind() != reflect.Struct && !isDive {
+		return reflect.Value{}, nil, reflect.Value{}, fmt.Errorf("payload should be struct")
+	}
+	return pVal, pType, vals, nil
+}
+
+/*
+*
+============ OWNERSHIP TO QUERY BINDING ===============
+*/
 const (
 	dataType = "dataType"
 	format   = "format"
@@ -236,8 +246,10 @@ const (
 	DataIsUUID    = "uuid"
 )
 
+type BindingFunc func(gCtx *gin.Context, val string, rules map[string]string) (interface{}, error)
+
 var (
-	binding = map[string]func(gCtx *gin.Context, val string, rules map[string]string) (interface{}, error){
+	bindingRules = map[string]BindingFunc{
 		DataIsTime: func(gCtx *gin.Context, val string, rules map[string]string) (interface{}, error) {
 			var format = time.RFC3339
 			if _, ok := rules["notNull"]; !ok && val == "" {
@@ -252,7 +264,7 @@ var (
 			if t, ok := gCtx.Get(constant.CtxKeyTimezone); ok {
 				tz, ok = t.(*time.Location)
 				if !ok {
-					return time.Time{}, fmt.Errorf("time location not found")
+					return time.Time{}, fmt.Errorf("clock location not found")
 				}
 			}
 
@@ -335,7 +347,6 @@ var (
 			}
 
 			return id, nil
-
 		},
 	}
 	getFromRequest = func(c *gin.Context, place string, fieldName string) string {
@@ -349,3 +360,23 @@ var (
 		}
 	}
 )
+
+/*
+*
+============ OWNERSHIP TO MULTIPART BINDING ===============
+*/
+const (
+	FormFile     = "file"
+	FormText     = "text"
+	FormUint     = "uint"
+	FormInt      = "int"
+	FormFloat    = "float"
+	FormBool     = "bool"
+	FormArray    = "array"
+	ArrayCounter = "arrayNaming"
+)
+
+type FileCompacted struct {
+	File     multipart.File
+	FileInfo *multipart.FileHeader
+}

@@ -4,6 +4,7 @@ type ResponseMeta struct {
 	Success      bool   `json:"success"`
 	MessageTitle string `json:"messageTitle"`
 	Message      string `json:"message"`
+	ErrorServer  string `json:"errorServer"`
 	ResponseTime string `json:"responseTime"`
 }
 
@@ -13,17 +14,18 @@ type ErrorResponse struct {
 	Errors any `json:"errors,omitempty"`
 }
 
-func DefaultErrorResponse() *ErrorResponse {
-	return DefaultErrorResponseWithMessage("")
+func DefaultErrorResponse(err error) *ErrorResponse {
+	return DefaultErrorResponseWithMessage("Internal Error", err)
 }
 
-func DefaultErrorResponseWithMessage(msg string) *ErrorResponse {
+func DefaultErrorResponseWithMessage(msg string, err error) *ErrorResponse {
 	return &ErrorResponse{
 		ResponseMeta: ResponseMeta{
 			Success:      false,
 			MessageTitle: "Oops, something went wrong.",
 			Message:      msg,
 			ResponseTime: "",
+			ErrorServer:  err.Error(),
 		},
 		Data: nil,
 	}
@@ -51,7 +53,7 @@ func DefaultDataInvalidResponse(validationErrors any) *ErrorResponse {
 }
 
 func DefaultBadRequestResponse() *ErrorResponse {
-	return DefaultErrorResponseWithMessage("Bad request")
+	return DefaultErrorResponseWithMessage("Bad request", nil)
 }
 
 type Response struct {
@@ -76,13 +78,32 @@ func DefaultInvalidInputFormResponse(errs map[string][]string) *Response {
 	}
 }
 
-func NewSuccessResponse(data any, msg string, resTime string) *Response {
+func NewSuccessResponseNoMsg(data any) *Response {
+	return &Response{
+		ResponseMeta: ResponseMeta{
+			Success:      true,
+			MessageTitle: "Success",
+		},
+		Data: data,
+	}
+}
+
+func NewSuccessResponseNoData(msg string) *Response {
 	return &Response{
 		ResponseMeta: ResponseMeta{
 			Success:      true,
 			Message:      msg,
 			MessageTitle: "Success",
-			ResponseTime: resTime,
+		},
+	}
+}
+
+func NewSuccessResponse(data any, msg string) *Response {
+	return &Response{
+		ResponseMeta: ResponseMeta{
+			Success:      true,
+			Message:      msg,
+			MessageTitle: "Success",
 		},
 		Data: data,
 	}

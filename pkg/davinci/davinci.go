@@ -3,6 +3,8 @@
 package davinci
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -11,6 +13,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/scrypt"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"strconv"
@@ -18,11 +21,6 @@ import (
 )
 
 type Engine struct {
-}
-
-type Generator interface {
-	GenerateHash(secretKey []byte, uniqueID string) (string, error)
-	GenerateHashValue(session string, id string, i int) (string, error)
 }
 
 func (dc Engine) GenerateHashValue(
@@ -174,4 +172,88 @@ func (dc Engine) ComparePassword(hashedPwd string, pwd []byte) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (d Engine) DeriveKey(password, salt []byte) ([]byte, []byte, error) {
+	if salt == nil {
+		salt = make([]byte, 32)
+		if _, err := rand.Read(salt); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	key, err := scrypt.Key(password, salt, 32768, 8, 1, 32)
+	if err != nil {
+
+		return nil, nil, err
+	}
+
+	return key, salt, nil
+}
+
+func (d Engine) DecryptMessage(key []byte, p string) (string, error) {
+	data, err := hex.DecodeString(p)
+	if err != nil {
+		return "", err
+	}
+	salt, data := data[len(data)-32:], data[:len(data)-32]
+
+	key, _, err = d.DeriveKey(key, salt)
+	if err != nil {
+
+		return "", err
+	}
+
+	blockCipher, err := aes.NewCipher(key)
+	if err != nil {
+
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(blockCipher)
+	if err != nil {
+
+		return "", err
+	}
+
+	nonce, ciphertext := data[:gcm.NonceSize()], data[gcm.NonceSize():]
+
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+
+		return "", err
+	}
+
+	return string(plaintext), nil
+}
+
+func (d Engine) EncryptMessage(key, data []byte) (string, error) {
+	key, salt, err := d.DeriveKey(key, nil)
+	if err != nil {
+
+		return "", err
+	}
+
+	blockCipher, err := aes.NewCipher(key)
+	if err != nil {
+
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(blockCipher)
+	if err != nil {
+
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = rand.Read(nonce); err != nil {
+		return "", err
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, data, nil)
+
+	ciphertext = append(ciphertext, salt...)
+
+	return hex.EncodeToString(ciphertext), nil
 }

@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"fmt"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-	"log"
 )
 
 func OverrideTranslation(engine *validator.Validate, trans ut.Translator) error {
@@ -14,7 +14,7 @@ func OverrideTranslation(engine *validator.Validate, trans ut.Translator) error 
 		return t
 	})
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return err
 	}
 
@@ -25,7 +25,7 @@ func OverrideTranslation(engine *validator.Validate, trans ut.Translator) error 
 		return t
 	})
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return err
 	}
 

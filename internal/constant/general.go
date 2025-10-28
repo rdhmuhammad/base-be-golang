@@ -28,6 +28,4 @@ const (
 	MIMEJPEG = "image/jpeg"
 	MIMEPDF  = "application/pdf"
 	MIMEXLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-	CtxKeyTimezone = "time.location"
 )

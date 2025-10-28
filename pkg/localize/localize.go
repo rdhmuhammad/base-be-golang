@@ -1,6 +1,7 @@
 package localize
 
 import (
+	"base-be-golang/pkg/environment"
 	"encoding/json"
 	"fmt"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -11,24 +12,43 @@ import (
 	"strings"
 )
 
-type Language struct {
+type lang struct {
 	bundle        *i18n.Bundle
 	localizer     map[string]*i18n.Localizer
 	defaultErrMsg *i18n.Message
+	env           environment.ENV
 }
 
-func (l *Language) GetLocalized(lang string, messageId string) (string, error) {
+type Language interface {
+	GetLocalized(lang string, messageId string, templates ...TemplatingData) string
+}
 
-	localizeConfig := i18n.LocalizeConfig{
-		MessageID:      messageId,
-		DefaultMessage: l.defaultErrMsg,
+type TemplatingData struct {
+	Name  string
+	Value string
+}
+
+func (l *lang) GetLocalized(lang string, messageId string, templates ...TemplatingData) string {
+	if lang == "" {
+		lang = l.env.Get("FALLBACK_LANG")
 	}
+	localizeConfig := i18n.LocalizeConfig{
+		MessageID: messageId,
+		//DefaultMessage: l.defaultErrMsg,
+	}
+
+	var newTemplate = make(map[string]string, len(templates))
+	for _, template := range templates {
+		newTemplate[template.Name] = template.Value
+	}
+
+	localizeConfig.TemplateData = newTemplate
 	localize, err := l.localizer[lang].Localize(&localizeConfig)
 	if err != nil {
-		return "", err
+		return ""
 	}
 
-	return localize, nil
+	return localize
 }
 
 func getFileResourceList(basePath string) []string {
@@ -66,7 +86,7 @@ func NewLanguage(basePath string) Language {
 		}
 	}
 
-	var localizer map[string]*i18n.Localizer
+	var localizer = make(map[string]*i18n.Localizer, 0)
 	for _, file := range fileResourceList {
 		localCode := strings.Split(filepath.Base(file), ".")
 		if len(localCode) < 2 {
@@ -80,9 +100,10 @@ func NewLanguage(basePath string) Language {
 		Other: "Internal Server Error",
 	}
 
-	return Language{
+	return &lang{
 		bundle:        defaultBundle,
 		localizer:     localizer,
 		defaultErrMsg: &defaultmessageEn,
+		env:           environment.NewEnvironment(),
 	}
 }
