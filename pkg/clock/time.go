@@ -3,7 +3,7 @@
 package clock
 
 import (
-	"base-be-golang/internal/constant"
+	"base-be-golang/shared/payload"
 	"context"
 	"fmt"
 	"time"
@@ -16,18 +16,14 @@ func Default() CLOCK {
 	return CLOCK{}
 }
 
-func (t CLOCK) SetTimezoneToContext(ctx context.Context, val string) context.Context {
-	if val == "" {
-		return context.WithValue(ctx, constant.CtxKeyTimezone, time.UTC)
-	}
-	tz, _ := time.LoadLocation(val)
-	return context.WithValue(ctx, constant.CtxKeyTimezone, *tz)
-}
+type ctxKey string
+
+const AuthCodeContext = ctxKey("authCode")
 
 func (t CLOCK) GetTimezoneFromContext(ctx context.Context) *time.Location {
-	lz := time.UTC
-	if ct, ok := ctx.Value(constant.CtxKeyTimezone).(time.Location); ok {
-		lz = &ct
+	var lz = time.UTC
+	if pd, ok := ctx.Value(AuthCodeContext).(payload.UserData); ok {
+		lz = pd.Tz
 	}
 	return lz
 }

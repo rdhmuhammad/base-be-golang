@@ -8,14 +8,14 @@ import (
 	"strconv"
 )
 
-func (m mapper) FloatPrecision(val float64, precision int) float64 {
+func (m Mapper) FloatPrecision(val float64, precision int) float64 {
 	prec := fmt.Sprintf("%%.%df", precision)
 	i := fmt.Sprintf(prec, val)
 	f, _ := strconv.ParseFloat(i, precision)
 	return f
 }
 
-func (m mapper) Base64ToReader(base64String string) (io.Reader, int64, error) {
+func (m Mapper) Base64ToReader(base64String string) (io.Reader, int64, error) {
 	// Remove data URL prefix if present (e.g., "data:image/png;base64,")
 	// This handles cases where the base64 string includes the MIME type prefix
 	if len(base64String) > 0 {

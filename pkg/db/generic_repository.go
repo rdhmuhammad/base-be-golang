@@ -3,12 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	"gorm.io/gorm/schema"
 	"reflect"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 )
 
 type GenericRepository[T schema.Tabler] struct {
@@ -715,6 +716,9 @@ func (repo GenericRepository[T]) fromStruct(elem reflect.Type) []string {
 	return results
 }
 
+/*
+Usage:
+*/
 func (repo GenericRepository[T]) FindOneByIDSelection(
 	ctx context.Context,
 	entity interface{},
@@ -733,6 +737,10 @@ func (repo GenericRepository[T]) FindOneByIDSelection(
 	return err
 }
 
+/*
+Note: for entity, struct field should contain tag gorm and key 'column'.
+only accept pointer of struct
+*/
 func (repo GenericRepository[T]) FindOneByExpSelection(
 	ctx context.Context,
 	entity interface{},

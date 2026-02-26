@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	CtxKeySession = "auth.session"
+	CtxKeySession = "auth.middleware"
 	KeyBranchID   = "branchId"
 
 	// Session Check Middleware

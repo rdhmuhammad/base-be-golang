@@ -1,11 +1,10 @@
-package dto
+package payload
 
 type ResponseMeta struct {
 	Success      bool   `json:"success"`
 	MessageTitle string `json:"messageTitle"`
 	Message      string `json:"message"`
 	ErrorServer  string `json:"errorServer"`
-	ResponseTime string `json:"responseTime"`
 }
 
 type ErrorResponse struct {
@@ -24,7 +23,6 @@ func DefaultErrorResponseWithMessage(msg string, err error) *ErrorResponse {
 			Success:      false,
 			MessageTitle: "Oops, something went wrong.",
 			Message:      msg,
-			ResponseTime: "",
 			ErrorServer:  err.Error(),
 		},
 		Data: nil,
@@ -37,7 +35,6 @@ func DefaultErrorInvalidDataWithMessage(msg string) *ErrorResponse {
 			Success:      false,
 			MessageTitle: "Invalid data.",
 			Message:      msg,
-			ResponseTime: "",
 		},
 	}
 }

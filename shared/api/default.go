@@ -5,13 +5,13 @@ import (
 	"base-be-golang/pkg/db"
 	"base-be-golang/pkg/middleware"
 	"base-be-golang/pkg/miniostorage"
-	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
-	"os"
-	"time"
 )
 
 func Default() *Api {
@@ -44,26 +44,24 @@ func Default() *Api {
 	// Add custom Sentry middleware for request enrichment
 	server.Use(middleware.SentryMiddleware())
 
-	_, err = db.Default()
+	dbConn, err := db.Default()
 	if err != nil {
 		panic(fmt.Sprintf("panic at db connection: %s", err.Error()))
 	}
 
-	_ = cache.Default()
+	dbCache := cache.Default()
 
-	_ = miniostorage.NewConnection(miniostorage.Conn{
+	minioStr := miniostorage.NewConnection(miniostorage.Conn{
 		Endpoint:  os.Getenv("MINIO_ENDPOINT"),
 		Bucket:    os.Getenv("MINIO_BUCKET"),
 		AccessKey: os.Getenv("MINIO_ACCESS_KEY"),
 		SecretKey: os.Getenv("MINIO_SECRET_KEY"),
 	})
 
-	var routers = []Router{}
-
-	middleware.CaptureErrorUsecase(context.Background(), fmt.Errorf("Start application"))
-
 	return &Api{
-		server:  server,
-		routers: routers,
+		server:   server,
+		cache:    dbCache,
+		minioStr: minioStr,
+		db:       dbConn,
 	}
 }

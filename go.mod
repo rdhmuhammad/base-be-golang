@@ -19,6 +19,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.6.0
+	github.com/rs/zerolog v1.34.0
 	golang.org/x/crypto v0.39.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/text v0.26.0
@@ -45,6 +46,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/crc64nvme v1.0.2 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect

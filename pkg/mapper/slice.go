@@ -1,5 +1,5 @@
 package mapper
 
-func (m mapper) removeCollectionInSlice() {
+func (m Mapper) removeCollectionInSlice() {
 
 }

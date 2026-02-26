@@ -1,4 +1,4 @@
-package dto
+package payload
 
 type Pagination struct {
 	PerPage      int `json:"perPage"`

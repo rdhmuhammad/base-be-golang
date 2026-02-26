@@ -2,22 +2,22 @@ package mapper
 
 import (
 	"base-be-golang/internal/constant"
-	"base-be-golang/internal/dto"
-	localerror "base-be-golang/internal/localerror"
 	localerror2 "base-be-golang/pkg/localerror"
 	"base-be-golang/pkg/localize"
 	"base-be-golang/pkg/middleware"
+	"base-be-golang/shared/payload"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/go-sql-driver/mysql"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-sql-driver/mysql"
 )
 
 // TODO: validation move to struct tags
-func (m mapper) TranslateSQLErr(mySqlErr *mysql.MySQLError, methodName string) error {
+func (m Mapper) TranslateSQLErr(mySqlErr *mysql.MySQLError, methodName string) error {
 	switch mySqlErr.Number {
 	case DuplicateEntryCode:
 		re := regexp.MustCompile(`for key '([^']+)`)
@@ -69,7 +69,7 @@ func (m mapper) TranslateSQLErr(mySqlErr *mysql.MySQLError, methodName string) e
 
 }
 
-func (receiver mapper) GetAuthDataFromContext(c *gin.Context) middleware.UserData {
+func (receiver Mapper) GetAuthDataFromContext(c *gin.Context) middleware.UserData {
 	authDataStr, ok := c.Get("authData")
 	if !ok {
 		return middleware.UserData{}
@@ -78,7 +78,7 @@ func (receiver mapper) GetAuthDataFromContext(c *gin.Context) middleware.UserDat
 	return authData
 }
 
-func (m mapper) NewResponse(c *gin.Context, res *dto.Response, err error) {
+func (m Mapper) NewResponse(c *gin.Context, res *payload.Response, err error) {
 	userData := m.GetAuthDataFromContext(c)
 	if err != nil {
 		if ok, invErr := m.IsInvalidDataError(err); ok {
@@ -93,14 +93,14 @@ func (m mapper) NewResponse(c *gin.Context, res *dto.Response, err error) {
 			}
 			c.JSON(
 				http.StatusBadRequest,
-				dto.DefaultErrorInvalidDataWithMessage(m.localizer.GetLocalized(userData.Lang, err.Error(), templates...)),
+				payload.DefaultErrorInvalidDataWithMessage(m.localizer.GetLocalized(userData.Lang, err.Error(), templates...)),
 			)
 			return
 		}
 		if m.IsAccessControlError(err) {
 			c.JSON(
 				http.StatusUnauthorized,
-				dto.DefaultErrorInvalidDataWithMessage(m.localizer.GetLocalized(userData.Lang, err.Error())),
+				payload.DefaultErrorInvalidDataWithMessage(m.localizer.GetLocalized(userData.Lang, err.Error())),
 			)
 			return
 		}
@@ -108,7 +108,7 @@ func (m mapper) NewResponse(c *gin.Context, res *dto.Response, err error) {
 		fmt.Printf("ERROR: %s \n", err.Error())
 		c.JSON(
 			http.StatusInternalServerError,
-			dto.DefaultErrorResponseWithMessage(m.localizer.GetLocalized(userData.Lang, constant.InternalError), err),
+			payload.DefaultErrorResponseWithMessage(m.localizer.GetLocalized(userData.Lang, constant.InternalError), err),
 		)
 		return
 	}
@@ -121,7 +121,7 @@ func (m mapper) NewResponse(c *gin.Context, res *dto.Response, err error) {
 	c.Status(http.StatusOK)
 }
 
-func (m mapper) IsInvalidDataError(err error) (bool, localerror2.InvalidDataError) {
+func (m Mapper) IsInvalidDataError(err error) (bool, localerror2.InvalidDataError) {
 	var invalidDataError localerror2.InvalidDataError
 	if errors.As(err, &invalidDataError) {
 		return true, invalidDataError
@@ -129,7 +129,7 @@ func (m mapper) IsInvalidDataError(err error) (bool, localerror2.InvalidDataErro
 	return false, invalidDataError
 }
 
-func (m mapper) IsAccessControlError(err error) bool {
+func (m Mapper) IsAccessControlError(err error) bool {
 	var invalidDataError localerror2.AccessControlError
 	if errors.As(err, &invalidDataError) {
 		return true
@@ -137,7 +137,7 @@ func (m mapper) IsAccessControlError(err error) bool {
 	return false
 }
 
-func (m mapper) CompareSliceOfErr(errs []error, target error) bool {
+func (m Mapper) CompareSliceOfErr(errs []error, target error) bool {
 	for _, err := range errs {
 		if errors.Is(err, target) {
 			return true
@@ -150,7 +150,7 @@ func (m mapper) CompareSliceOfErr(errs []error, target error) bool {
 	return false
 }
 
-func (m mapper) ErrorIs(template error, targer error) bool {
+func (m Mapper) ErrorIs(template error, targer error) bool {
 	re := regexp.MustCompile(`\{[0-9]+}`)
 	pattern := re.ReplaceAllString(template.Error(), ".+")
 
@@ -167,7 +167,7 @@ func (m mapper) ErrorIs(template error, targer error) bool {
 	return false
 }
 
-func (m mapper) ReplaceLabelErr(template error, params ...string) error {
+func (m Mapper) ReplaceLabelErr(template error, params ...string) error {
 	customeErr := template.Error()
 	for i, param := range params {
 		customeErr = strings.Replace(

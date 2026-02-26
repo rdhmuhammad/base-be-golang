@@ -1,11 +1,12 @@
 package main
 
 import (
-	"base-be-golang/pkg/api"
+	"base-be-golang/shared/api"
 	"flag"
+	"log"
+
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
-	"log"
 )
 
 func main() {

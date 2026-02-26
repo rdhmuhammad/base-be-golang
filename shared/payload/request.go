@@ -1,11 +1,12 @@
-package dto
+package payload
 
 import (
 	"base-be-golang/internal/constant"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type GetListQueryNoPeriod struct {

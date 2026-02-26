@@ -94,7 +94,7 @@ var (
 	}
 )
 
-func (m mapper) typeIsArray(vals interface{}) bool {
+func (m Mapper) typeIsArray(vals interface{}) bool {
 	pVal := reflect.ValueOf(vals)
 	if pVal.Kind() != reflect.Slice && pVal.Kind() != reflect.Array {
 		return false
@@ -103,7 +103,7 @@ func (m mapper) typeIsArray(vals interface{}) bool {
 	return true
 }
 
-func (m mapper) ContainByStructField(target interface{}, fieldName string, val interface{}) bool {
+func (m Mapper) ContainByStructField(target interface{}, fieldName string, val interface{}) bool {
 	pVal := reflect.ValueOf(target)
 	if !m.typeIsArray(target) {
 		return false
@@ -120,7 +120,7 @@ func (m mapper) ContainByStructField(target interface{}, fieldName string, val i
 	return false
 }
 
-func (m mapper) UniqueByStructField(vals interface{}, fieldName string) interface{} {
+func (m Mapper) UniqueByStructField(vals interface{}, fieldName string) interface{} {
 	var newArr = make([]interface{}, 0)
 	pVal := reflect.ValueOf(vals)
 	if !m.typeIsArray(vals) || pVal.Len() == 0 {
@@ -138,7 +138,7 @@ func (m mapper) UniqueByStructField(vals interface{}, fieldName string) interfac
 	return newArr
 }
 
-func (m mapper) SortingByStructField(vals interface{}, fieldName string, sorting SortingDirection) interface{} {
+func (m Mapper) SortingByStructField(vals interface{}, fieldName string, sorting SortingDirection) interface{} {
 	pVal := reflect.ValueOf(vals)
 	if !m.typeIsArray(vals) {
 		fmt.Println("SortingByStructField: val type should array")
@@ -168,7 +168,7 @@ func (m mapper) SortingByStructField(vals interface{}, fieldName string, sorting
 	return newArr
 }
 
-func (m mapper) ParseServiceDurationFormat(d string) (string, error) {
+func (m Mapper) ParseServiceDurationFormat(d string) (string, error) {
 	ds := strings.Split(d, ":")
 
 	var digits = make([]int, len(ds))

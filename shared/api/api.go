@@ -1,21 +1,29 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
+	"base-be-golang/pkg/cache"
+	"base-be-golang/pkg/miniostorage"
 	"os"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type Api struct {
-	server  *gin.Engine
-	routers []Router
+	server   *gin.Engine
+	db       *gorm.DB
+	cache    cache.DbClient
+	minioStr miniostorage.StorageMinio
+	routers  []Router
 }
 
 type Router interface {
 	Route(handler *gin.RouterGroup)
 }
 
-func (a Api) Start() error {
+func (a *Api) Start() error {
 	root := a.server.Group("/api/v1")
+
 	for _, router := range a.routers {
 		router.Route(root)
 	}

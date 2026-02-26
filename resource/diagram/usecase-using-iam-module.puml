@@ -1,0 +1,43 @@
+@startuml
+
+
+package root #ebae34{
+    class Port
+    class Example
+
+    Port --|> Example
+}
+
+package startup #ebae34{
+    class Api{
+        -[]Router routers
+        -start()
+    }
+
+    interface Router{
+        +Route(handler)
+    }
+
+    Api "1" ..* "many" Router: containt
+}
+
+package iam #0fc7fa {
+    class Auth
+    class IAM
+    interface UserUsecase
+    class UserController{
+        +Route(handler)
+        +NewUserController(...)
+    }
+
+
+    UserController <|.. Router
+    UserController "0"-->"1" Api : call NewUserController(..)
+    Auth --|> IAM
+    UserUsecase --|> IAM
+    IAM --|> Port
+}
+
+
+
+@enduml
