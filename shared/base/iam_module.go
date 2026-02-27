@@ -5,6 +5,8 @@ import (
 	"base-be-golang/pkg/logger"
 	"base-be-golang/shared/payload"
 	"context"
+	"os"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	md "github.com/rdhmuhammad/base-be-golang/iam-module/pkg/middleware"
@@ -13,6 +15,9 @@ import (
 )
 
 func NewAuth(dbConn *gorm.DB, dbCache cache.DbClient) Security {
+	if t, _ := strconv.ParseBool(os.Getenv("IAM_MODULE_OFF")); t {
+		return EmptyAuth{}
+	}
 	return md.NewAuth(dbConn, dbCache)
 }
 

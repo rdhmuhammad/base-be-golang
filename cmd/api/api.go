@@ -5,6 +5,8 @@ import (
 	"base-be-golang/shared/base"
 	"flag"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
@@ -27,12 +29,14 @@ func main() {
 
 	// ========================= REGISTER CONTROLLER =========================
 	// IAM MODULE
-	start.Register(func(dbConn *gorm.DB, port base.Port, ctrl base.BaseController) api.Router {
-		return controller.NewAuthController(dbConn, port, ctrl)
-	})
-	start.Register(func(dbConn *gorm.DB, port base.Port, ctrl base.BaseController) api.Router {
-		return controller.NewUserManagementController(dbConn, port, ctrl)
-	})
+	if t, _ := strconv.ParseBool(os.Getenv("IAM_MODULE_OFF")); !t {
+		start.Register(func(dbConn *gorm.DB, port base.Port, ctrl base.BaseController) api.Router {
+			return controller.NewAuthController(dbConn, port, ctrl)
+		})
+		start.Register(func(dbConn *gorm.DB, port base.Port, ctrl base.BaseController) api.Router {
+			return controller.NewUserManagementController(dbConn, port, ctrl)
+		})
+	}
 
 	// BUSINESS MODULE
 
