@@ -1,26 +1,27 @@
 package middleware
 
 import (
-	"base-be-golang/internal/dto"
 	"base-be-golang/pkg/cache"
+	"base-be-golang/shared/payload"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type IDEMPOTENT struct {
-	cache cache.Cache
+	cache cache.DbClient
 }
 
 func NewIdempotent(
-	defaultCache cache.Cache,
+	defaultCache cache.DbClient,
 ) IDEMPOTENT {
 	return IDEMPOTENT{
 		cache: defaultCache,
@@ -63,7 +64,7 @@ func (idem IDEMPOTENT) Idempotent(name string, paramKey string, lockTime time.Du
 			fmt.Println("IDEMPOTENT.go 68: ", err)
 		}
 		if lock != "" {
-			c.JSON(http.StatusConflict, dto.DefaultErrorResponseWithMessage("IDEMPOTENT request", err))
+			c.JSON(http.StatusConflict, payload.DefaultErrorResponseWithMessage("IDEMPOTENT request", err))
 			c.Abort()
 			return
 		}

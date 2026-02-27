@@ -12,17 +12,18 @@ import (
 type CLOCK struct {
 }
 
+func (t CLOCK) SetTimezoneToContext(ctx context.Context, val string) context.Context {
+	//TODO implement me
+	panic("implement me")
+}
+
 func Default() CLOCK {
 	return CLOCK{}
 }
 
-type ctxKey string
-
-const AuthCodeContext = ctxKey("authCode")
-
 func (t CLOCK) GetTimezoneFromContext(ctx context.Context) *time.Location {
 	var lz = time.UTC
-	if pd, ok := ctx.Value(AuthCodeContext).(payload.UserData); ok {
+	if pd, ok := ctx.Value(payload.AuthCodeContext).(payload.UserData); ok {
 		lz = pd.Tz
 	}
 	return lz

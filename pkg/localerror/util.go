@@ -2,9 +2,9 @@ package localerror
 
 import (
 	"base-be-golang/pkg/logger"
-	"base-be-golang/shared/constant"
 	"errors"
 
+	"github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"gorm.io/gorm"
 )
 
@@ -27,14 +27,14 @@ func (e AccessControlError) Error() string {
 
 func AccessNotAllowedUserNotFound(err error) error {
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return AccessControlError{Msg: constant.SessionExpired}
+		return AccessControlError{Msg: constant.SessionExpired.String()}
 	}
 
 	return err
 }
 
 func IsAccessNotAllowedUserNotFound(err error) bool {
-	return err != nil && errors.Is(err, AccessControlError{Msg: constant.SessionExpired})
+	return err != nil && errors.Is(err, AccessControlError{Msg: constant.SessionExpired.String()})
 }
 
 func IsNotFound(err error) bool {

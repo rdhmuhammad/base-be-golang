@@ -20,6 +20,7 @@ import (
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/constant"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/domain"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/pkg/security"
+	constant2 "github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -37,9 +38,10 @@ type auth interface {
 	GenerateSingleToken(claim security.SingleTokenClaim) (string, error)
 }
 
-func NewUsecase(dbConn *gorm.DB) Usecase {
+func NewUsecase(dbConn *gorm.DB, port base.Port) Usecase {
 	return Usecase{
 		auth:          security.NewAuth(),
+		Port:          port,
 		userAdminRepo: db.NewGenericeRepo[domain.UserAdmin](dbConn, domain.UserAdmin{}),
 		userRepo:      db.NewGenericeRepo[domain.User](dbConn, domain.User{}),
 	}
@@ -116,7 +118,7 @@ func (u Usecase) Login(ctx context.Context, request LoginRequest) (LoginResponse
 		})
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return LoginResponse{}, localerror.InvalidData(constant.LoginPasswordMismatch.String())
+				return LoginResponse{}, localerror.InvalidData(constant2.LoginPasswordMismatch.String())
 			}
 			return LoginResponse{}, err
 		}
@@ -124,7 +126,7 @@ func (u Usecase) Login(ctx context.Context, request LoginRequest) (LoginResponse
 		userMobile = data
 
 		if !data.GetIsVerified() {
-			return LoginResponse{}, localerror.InvalidData(constant.LoginUnverified.String())
+			return LoginResponse{}, localerror.InvalidData(constant2.LoginUnverified.String())
 		}
 		break
 	case constant.ContextDashboard:
@@ -134,7 +136,7 @@ func (u Usecase) Login(ctx context.Context, request LoginRequest) (LoginResponse
 			[]string{"Role"}, nil)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return LoginResponse{}, localerror.InvalidData(constant.LoginPasswordMismatch.String())
+				return LoginResponse{}, localerror.InvalidData(constant2.LoginPasswordMismatch.String())
 			}
 			return LoginResponse{}, err
 		}
@@ -146,7 +148,7 @@ func (u Usecase) Login(ctx context.Context, request LoginRequest) (LoginResponse
 	if rawPas, err := u.Davinci.DecryptMessage([]byte(u.Env.Get("ENCRYPT_MESSAGE_PASSWORD")), user.GetPassword()); err != nil {
 		return LoginResponse{}, err
 	} else if rawPas != request.Password {
-		return LoginResponse{}, localerror.InvalidData(constant.LoginPasswordMismatch.String())
+		return LoginResponse{}, localerror.InvalidData(constant2.LoginPasswordMismatch.String())
 	}
 
 	userReference, err := u.Davinci.GenerateHash([]byte(u.Env.Get("SECRET_USER_ID")), strconv.FormatUint(uint64(user.GetID()), 10))
@@ -229,7 +231,7 @@ func (u Usecase) Register(ctx context.Context, request RegisterRequest) (Registe
 		return RegisterResponse{}, err
 	}
 	if exist {
-		return RegisterResponse{}, localerror.InvalidData(constant.RegisterEmailUsed.String())
+		return RegisterResponse{}, localerror.InvalidData(constant2.RegisterEmailUsed.String())
 	}
 
 	encryptMessage, err := u.Davinci.EncryptMessage([]byte(u.Env.Get("ENCRYPT_MESSAGE_PASSWORD")), []byte(request.Password))
@@ -283,7 +285,7 @@ func (u Usecase) VerifyAcc(ctx context.Context, request VerifyAccRequest) (Verif
 	user, err := u.userRepo.FindOneByExpression(ctx, []clause.Expression{db.Equal(request.Email, "email")})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VerifyAccResponse{}, localerror.InvalidData(constant.EmailNotFound.String())
+			return VerifyAccResponse{}, localerror.InvalidData(constant2.EmailNotFound.String())
 		}
 		return VerifyAccResponse{}, err
 	}
@@ -291,7 +293,7 @@ func (u Usecase) VerifyAcc(ctx context.Context, request VerifyAccRequest) (Verif
 	isExpired, err := u.Cache.Get(ctx, constant.CacheKeyOTP+strconv.FormatInt(int64(request.Otp), 10))
 	if err != nil {
 		if errors.Is(redis.Nil, err) {
-			return VerifyAccResponse{}, localerror.InvalidData(constant.VerifyOtpExpired.String())
+			return VerifyAccResponse{}, localerror.InvalidData(constant2.VerifyOtpExpired.String())
 		}
 		return VerifyAccResponse{}, err
 	}
@@ -299,7 +301,7 @@ func (u Usecase) VerifyAcc(ctx context.Context, request VerifyAccRequest) (Verif
 	if parseBool, err := strconv.ParseBool(isExpired); err != nil {
 		return VerifyAccResponse{}, err
 	} else if !parseBool {
-		return VerifyAccResponse{}, localerror.InvalidData(constant.VerifyOtpExpired.String())
+		return VerifyAccResponse{}, localerror.InvalidData(constant2.VerifyOtpExpired.String())
 	}
 	if user.OTPCode != request.Otp {
 		return VerifyAccResponse{IsVerified: false}, nil
@@ -318,7 +320,7 @@ func (u Usecase) ResendOTP(ctx context.Context, request SendOtpRequest) error {
 	user, err := u.userRepo.FindOneByExpression(ctx, []clause.Expression{db.Equal(request.Email, "email")})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return localerror.InvalidData(constant.EmailNotFound.String())
+			return localerror.InvalidData(constant2.EmailNotFound.String())
 		}
 		return err
 	}
@@ -357,7 +359,7 @@ func (u Usecase) GenerateAndSendOTP(
 		if err != nil {
 
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return SendOtpResponse{}, localerror.InvalidData(constant.EmailNotFound.String())
+				return SendOtpResponse{}, localerror.InvalidData(constant2.EmailNotFound.String())
 			}
 			return SendOtpResponse{}, err
 		}
@@ -365,7 +367,7 @@ func (u Usecase) GenerateAndSendOTP(
 		emailPayload.Name = user.FullName
 
 		if user.IsVerified == 1 {
-			return SendOtpResponse{}, localerror.InvalidData(constant.UserAlreadyVerified.String())
+			return SendOtpResponse{}, localerror.InvalidData(constant2.UserAlreadyVerified.String())
 		}
 	}
 

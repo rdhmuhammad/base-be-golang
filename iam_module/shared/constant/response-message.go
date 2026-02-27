@@ -11,6 +11,8 @@ const (
 	EmailNotFound
 	VerifyOtpExpired
 	UserAlreadyVerified
+	AccessNotAllowed
+	SessionExpired
 
 	// registration
 	LogoutSuccess

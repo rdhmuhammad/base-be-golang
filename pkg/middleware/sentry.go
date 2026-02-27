@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"base-be-golang/shared/payload"
 	"bytes"
 	"context"
 	"io"
@@ -90,7 +91,7 @@ func enrichSentryWithUserData(hub *sentry.Hub, c *gin.Context) {
 
 func getUserFromContext(hub *sentry.Hub, c context.Context) {
 	// Also try to get user data from request context (authCodeContext)
-	if authData := c.Value(AuthCodeContext); authData != nil {
+	if authData := c.Value(payload.AuthCodeContext); authData != nil {
 		if userData, ok := authData.(UserData); ok {
 			hub.ConfigureScope(func(scope *sentry.Scope) {
 				// Set user information

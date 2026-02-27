@@ -8,7 +8,6 @@ import (
 	"base-be-golang/pkg/localerror"
 	"base-be-golang/pkg/localize"
 	"base-be-golang/pkg/logger"
-	"base-be-golang/shared/constant"
 	"base-be-golang/shared/payload"
 	"context"
 	"encoding/json"
@@ -21,7 +20,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/constant"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/domain"
+	constant2 "github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
@@ -63,7 +64,7 @@ func (receiver Auth) Authorize(roles ...string) gin.HandlerFunc {
 		}
 
 		response := payload.DefaultBadRequestResponse()
-		response.Message = receiver.localize.GetLocalized(authData.Lang, constant.AccessNotAllowed)
+		response.Message = receiver.localize.GetLocalized(authData.Lang, constant2.AccessNotAllowed.String())
 		c.JSON(http.StatusUnauthorized, response)
 		c.Abort()
 	}
@@ -95,7 +96,7 @@ func (receiver Auth) GetSession(ctx context.Context, authCode string, sessionDat
 	sessionStr, err := receiver.cache.Get(ctx, loginCacheKey+authCode)
 	if err != nil {
 		if errors.Is(redis.Nil, err) {
-			return localerror.AccessControlError{Msg: constant.AccessNotAllowed}
+			return localerror.AccessControlError{Msg: constant2.AccessNotAllowed.String()}
 		}
 		return err
 	}
@@ -141,7 +142,7 @@ func (receiver Auth) Validate() gin.HandlerFunc {
 		err = userDataStruct.LoadFromMap(authData)
 		if err != nil {
 			response := payload.DefaultErrorResponse(err)
-			response.Message = receiver.localize.GetLocalized(userDataStruct.Lang, constant.SessionExpired)
+			response.Message = receiver.localize.GetLocalized(userDataStruct.Lang, constant2.SessionExpired.String())
 			c.JSON(http.StatusUnauthorized, response)
 			c.Abort()
 			return
@@ -175,7 +176,7 @@ func (receiver Auth) parseToken(tokenStr string, secret []byte) (*jwt.Token, err
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			logger.Error(fmt.Errorf("invalid token format"))
-			return nil, localerror.AccessControlError{Msg: constant.AccessNotAllowed}
+			return nil, localerror.AccessControlError{Msg: constant2.AccessNotAllowed.String()}
 		}
 		return secret, nil
 	})
@@ -188,10 +189,10 @@ func (receiver Auth) parseToken(tokenStr string, secret []byte) (*jwt.Token, err
 		if valid := claims.VerifyExpiresAt(receiver.clock.NowUTC().Unix(), true); valid {
 			return token, nil
 		}
-		return nil, localerror.AccessControlError{Msg: constant.SessionExpired}
+		return nil, localerror.AccessControlError{Msg: constant2.SessionExpired.String()}
 	}
 
-	return nil, localerror.AccessControlError{Msg: constant.SessionExpired}
+	return nil, localerror.AccessControlError{Msg: constant2.SessionExpired.String()}
 }
 
 func (receiver Auth) getAuthData(token *jwt.Token) (map[string]interface{}, bool) {

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/constant"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/usecase/registration"
+	constant2 "github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"gorm.io/gorm"
 )
 
@@ -18,10 +19,10 @@ type AuthController struct {
 	uc AuthUsecaseInterface
 }
 
-func NewAuthController(db *gorm.DB, ctrl base.BaseController) AuthController {
+func NewAuthController(dbConn *gorm.DB, port base.Port, controller base.BaseController) AuthController {
 	return AuthController{
-		BaseController: ctrl,
-		uc:             registration.NewUsecase(db),
+		BaseController: controller,
+		uc:             registration.NewUsecase(dbConn, port),
 	}
 }
 
@@ -35,7 +36,7 @@ type AuthUsecaseInterface interface {
 
 func (ctrl AuthController) Logout(c *gin.Context, role string) {
 	err := ctrl.uc.Logout(c.Request.Context(), role)
-	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponseNoData(constant.LogoutSuccess.String()), err)
+	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponseNoData(constant2.LogoutSuccess.String()), err)
 }
 
 func (ctrl AuthController) Login(c *gin.Context, role string) {
@@ -46,7 +47,7 @@ func (ctrl AuthController) Login(c *gin.Context, role string) {
 	}
 	request.Role = role
 	result, err := ctrl.uc.Login(c.Request.Context(), request)
-	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant.LoginSuccess.String()), err)
+	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant2.LoginSuccess.String()), err)
 }
 
 func (ctrl AuthController) Register(c *gin.Context) {
@@ -57,7 +58,7 @@ func (ctrl AuthController) Register(c *gin.Context) {
 	}
 
 	result, err := ctrl.uc.Register(c.Request.Context(), request)
-	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant.RegisterSuccess.String()), err)
+	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant2.RegisterSuccess.String()), err)
 }
 
 func (ctrl AuthController) VerifyAcc(c *gin.Context) {
@@ -68,7 +69,7 @@ func (ctrl AuthController) VerifyAcc(c *gin.Context) {
 	}
 
 	result, err := ctrl.uc.VerifyAcc(c.Request.Context(), request)
-	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant.VerifyOtpSuccess.String()), err)
+	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant2.VerifyOtpSuccess.String()), err)
 }
 
 func (ctrl AuthController) ResendOTP(c *gin.Context) {
@@ -78,7 +79,7 @@ func (ctrl AuthController) ResendOTP(c *gin.Context) {
 	}
 
 	err := ctrl.uc.ResendOTP(c.Request.Context(), request)
-	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponseNoData(constant.ResendOtpSuccess.String()), err)
+	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponseNoData(constant2.ResendOtpSuccess.String()), err)
 }
 
 func (ctrl AuthController) Route(router *gin.RouterGroup) {

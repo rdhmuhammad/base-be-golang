@@ -11,6 +11,7 @@ import (
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/adapter/repository"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/constant"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/domain"
+	constant2 "github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -66,7 +67,7 @@ func (u Usecase) UpsertUser(ctx context.Context, request CreateUserRequest, acti
 	if action == ActionIsUpdateUser && request.Password == "" {
 		d, err := u.userAdminRepo.FindOneByID(ctx, request.ID)
 		if err != nil {
-			err = localerror.NotFound(err, constant.UserNotFound.String())
+			err = localerror.NotFound(err, constant2.UserNotFound.String())
 			return u.ErrHandler.ErrorReturn(err)
 		}
 		encryptMessage = d.Password
@@ -118,7 +119,7 @@ func (u Usecase) UpsertUser(ctx context.Context, request CreateUserRequest, acti
 func (u Usecase) GetDetail(ctx context.Context, id uint) (UserDetailItem, error) {
 
 	// user admin repo
-	if item, role, err := u.userAdminDetail(ctx, id); err != nil && !localerror.IsNotFoundStr(constant.UserNotFound.String(), err) {
+	if item, role, err := u.userAdminDetail(ctx, id); err != nil && !localerror.IsNotFoundStr(constant2.UserNotFound.String(), err) {
 		return UserDetailItem{}, err
 	} else if item != nil {
 		detailItem := DefaultUserDetailItem(item)
@@ -140,7 +141,7 @@ func (u Usecase) GetDetail(ctx context.Context, id uint) (UserDetailItem, error)
 func (u Usecase) userMobileDetail(ctx context.Context, id uint) (domain.UserEntityInterface, error) {
 	userMobile, err := u.userRepo.FindOneByID(ctx, id)
 	if err != nil {
-		err = localerror.NotFound(err, constant.UserNotFound.String())
+		err = localerror.NotFound(err, constant2.UserNotFound.String())
 		return nil, err
 	}
 	return &userMobile, nil
@@ -152,7 +153,7 @@ func (u Usecase) userAdminDetail(ctx context.Context, id uint) (domain.UserEntit
 		[]clause.Expression{db.Equal(id, "user_admins.id")},
 		[]string{"Role"}, nil)
 	if err != nil {
-		err = localerror.NotFound(err, constant.UserNotFound.String())
+		err = localerror.NotFound(err, constant2.UserNotFound.String())
 		return nil, domain.MasterRole{}, err
 	}
 	role = userAdmin.Role

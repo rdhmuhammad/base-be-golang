@@ -2,6 +2,7 @@ package api
 
 import (
 	"base-be-golang/pkg/cache"
+	"base-be-golang/pkg/logger"
 	"base-be-golang/pkg/miniostorage"
 	"os"
 
@@ -14,6 +15,7 @@ type Api struct {
 	db       *gorm.DB
 	cache    cache.DbClient
 	minioStr miniostorage.StorageMinio
+	reZero   *logger.ReZero
 	routers  []Router
 }
 

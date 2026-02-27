@@ -3,24 +3,26 @@
 package middleware
 
 import (
-	"base-be-golang/internal/constant"
+	"base-be-golang/shared/payload"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
+
 	"github.com/gin-gonic/gin"
 	en2 "github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	translations_en "github.com/go-playground/validator/v10/translations/en"
 	"github.com/google/uuid"
-	"mime/multipart"
 
 	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"reflect"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type Enigma struct {
@@ -261,10 +263,13 @@ var (
 			}
 
 			var tz *time.Location
-			if t, ok := gCtx.Get(constant.CtxKeyTimezone); ok {
-				tz, ok = t.(*time.Location)
+			if dt, ok := gCtx.Get(string(payload.AuthCodeContext)); ok {
+				d, ok := dt.(payload.UserData)
 				if !ok {
 					return time.Time{}, fmt.Errorf("clock location not found")
+				}
+				if d.Tz != nil {
+					tz = d.Tz
 				}
 			}
 

@@ -58,10 +58,12 @@ func Default() *Api {
 		SecretKey: os.Getenv("MINIO_SECRET_KEY"),
 	})
 
-	return &Api{
+	api := Api{
 		server:   server,
 		cache:    dbCache,
 		minioStr: minioStr,
 		db:       dbConn,
 	}
+
+	return &api
 }

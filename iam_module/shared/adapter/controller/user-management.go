@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/adapter/repository"
-	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/constant"
 	"github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/domain"
 	user_management "github.com/rdhmuhammad/base-be-golang/iam-module/internal/core/usecase/usermanagement"
+	"github.com/rdhmuhammad/base-be-golang/iam-module/shared/constant"
 	"gorm.io/gorm"
 )
 
@@ -27,13 +27,9 @@ type UserManagementUsecase interface {
 	GetList(ctx context.Context, query repository.UserListQuery) (payload.PaginationResponse[domain.UserListItem], error)
 }
 
-func NewUserManagementController(
-	dbConn *gorm.DB,
-	ctrl base.BaseController,
-	port base.Port,
-) UserManagementController {
+func NewUserManagementController(dbConn *gorm.DB, port base.Port, controller base.BaseController) UserManagementController {
 	return UserManagementController{
-		BaseController: ctrl,
+		BaseController: controller,
 		uc:             user_management.NewUsecase(dbConn, port),
 	}
 }
@@ -101,4 +97,9 @@ func (ctrl UserManagementController) GetListUser(c *gin.Context) {
 	request.Filter.SetIfEmpty()
 	result, err := ctrl.uc.GetList(c.Request.Context(), request)
 	ctrl.Mapper.NewResponse(c, payload.NewSuccessResponse(result, constant.GetListUser.String()), err)
+}
+
+func (ctrl UserManagementController) Route(handler *gin.RouterGroup) {
+	//TODO implement me
+	panic("implement me")
 }

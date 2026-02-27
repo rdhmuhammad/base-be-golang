@@ -14,6 +14,17 @@ func NewEnvironment() ENV {
 
 type ENV struct{}
 
+func (e ENV) GetFloat(key string, defaultValue float64) float64 {
+	str := os.Getenv(key)
+	value, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		fmt.Println("featureflag.ENV.GetFloat:", err)
+		value = defaultValue
+	}
+
+	return value
+}
+
 func (e ENV) GetBranchID() uint {
 	return e.GetUint("BRANCH_ID", 1)
 }

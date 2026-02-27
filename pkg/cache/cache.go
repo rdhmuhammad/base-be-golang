@@ -51,18 +51,6 @@ func (rdb *DbClient) SetNX(ctx context.Context, key string, value interface{}, e
 	return nil
 }
 
-var unlockScript = redis.NewScript(`
-if redis.call("GET", KEYS[1]) == ARGV[1] then
-  return redis.call("DEL", KEYS[1])
-else
-  return 0
-end
-`)
-
-func (rdb *DbClient) Lock(ctx context.Context, key string) error {
-	unlockScript.Run(ctx, key)
-}
-
 // Get retrieves key in form of string.
 func (rdb *DbClient) Get(ctx context.Context, key string) (string, error) {
 	value, err := rdb.client.Get(ctx, key).Result()

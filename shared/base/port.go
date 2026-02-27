@@ -2,7 +2,11 @@ package base
 
 import (
 	"base-be-golang/pkg/cache"
+	"base-be-golang/pkg/clock"
 	"base-be-golang/pkg/davinci"
+	"base-be-golang/pkg/environment"
+	"base-be-golang/pkg/localerror"
+	"base-be-golang/pkg/logger"
 	"base-be-golang/pkg/mailing"
 	"base-be-golang/pkg/mapper"
 	"base-be-golang/pkg/middleware"
@@ -14,7 +18,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	md "github.com/rdhmuhammad/base-be-golang/iam-module/pkg/middleware"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +29,18 @@ type Port struct {
 	Davinci    Generator
 	Mailing    Mailing
 	Clock      Clock
+}
+
+func NewPort(dbConn *gorm.DB, dbCache cache.DbClient, zero *logger.ReZero) Port {
+	return Port{
+		Security:   NewAuth(dbConn, dbCache),
+		ErrHandler: localerror.NewHandlerError(zero),
+		Cache:      &dbCache,
+		Env:        environment.NewEnvironment(),
+		Davinci:    davinci.DefaultDavinci(),
+		Mailing:    mailing.NewConfig(),
+		Clock:      clock.Default(),
+	}
 }
 
 type Security interface {
@@ -134,7 +149,7 @@ func NewBaseController(db *gorm.DB, dbCache cache.DbClient) BaseController {
 	return BaseController{
 		Mapper:   mapper.NewMapper(),
 		Enigma:   middleware.NewEnigma(),
-		Security: md.NewAuth(db, dbCache),
+		Security: NewAuth(db, dbCache),
 	}
 }
 

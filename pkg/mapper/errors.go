@@ -1,7 +1,6 @@
 package mapper
 
 import (
-	"base-be-golang/internal/constant"
 	localerror2 "base-be-golang/pkg/localerror"
 	"base-be-golang/pkg/localize"
 	"base-be-golang/pkg/middleware"
@@ -108,7 +107,7 @@ func (m Mapper) NewResponse(c *gin.Context, res *payload.Response, err error) {
 		fmt.Printf("ERROR: %s \n", err.Error())
 		c.JSON(
 			http.StatusInternalServerError,
-			payload.DefaultErrorResponseWithMessage(m.localizer.GetLocalized(userData.Lang, constant.InternalError), err),
+			payload.DefaultErrorResponseWithMessage(m.localizer.GetLocalized(userData.Lang, "InternalError"), err),
 		)
 		return
 	}
