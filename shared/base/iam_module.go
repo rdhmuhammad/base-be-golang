@@ -44,13 +44,19 @@ func (e EmptyAuth) Authorize(roles ...string) gin.HandlerFunc {
 }
 
 func (e EmptyAuth) SetSession(ctx context.Context, user payload.SessionDataUser) error {
+	logger.Debug("using empty auth")
+	<-ctx.Done()
 	return nil
 }
 
 func (e EmptyAuth) GetSession(ctx context.Context, authCode string, sessionData *payload.SessionDataUser) error {
+	logger.Debug("using empty auth")
+	<-ctx.Done()
 	return nil
 }
 
 func (e EmptyAuth) GetSessionLogin(ctx context.Context, sessionData *payload.SessionDataUser) error {
+	logger.Debug("using empty auth")
+	<-ctx.Done()
 	return nil
 }
